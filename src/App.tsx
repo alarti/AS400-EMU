@@ -299,6 +299,12 @@ export default function App() {
       logs.push("  WRKMBRPDM / PDM        - Trabajar con miembros de desarrollo (COBOL/RPG)");
       logs.push("  STRSQL                 - Iniciar consulta interactiva SQL DB2/400");
       logs.push("  DSPPFM FILE(Nombre)    - Mostrar contenido de un Archivo Físico");
+      logs.push("  DSPDBR FILE(Nombre)    - Mostrar relaciones de archivos de base de datos");
+      logs.push("  DSPFD FILE(Nombre)     - Mostrar descripción del archivo físico/lógico");
+      logs.push("  DSPFFD FILE(Nombre)    - Mostrar descripción detallada de campos del archivo");
+      logs.push("  FNDSTRPDM 'cadena'     - Buscar un texto en todos los miembros de código");
+      logs.push("  CPYF FROMFILE() ...    - Copiar archivos físicos y sus registros de datos");
+      logs.push("  DSPRPG                 - Mostrar Manual RPG (Hojas H/F/E/I/C, Ciclo, SETLL)");
       logs.push("  CALL PGM(Nombre)       - Ejecutar un programa compilado");
       logs.push("  SNDMSG MSG('...')      - Enviar un mensaje al operador del sistema (QSYSOPR)");
       logs.push("  STRS36                 - Iniciar Entorno de Compatibilidad System/36 (S/36)");
@@ -431,6 +437,382 @@ export default function App() {
       } else {
         logs.push(`[ERROR CL] El archivo físico '${filename}' no existe en la biblioteca de pruebas.`);
       }
+    }
+    // DSPDBR command - Relaciones de base de datos
+    else if (upperCmd.startsWith("DSPDBR")) {
+      const match = trimmed.match(/FILE\((.*?)\)/i);
+      const filename = match ? match[1].toUpperCase() : trimmed.substring(6).trim().toUpperCase();
+      
+      if (!filename) {
+        logs.push("================ RELACIONES DE BASE DE DATOS (DSPDBR) ================");
+        logs.push("Uso: DSPDBR FILE(nombre_archivo)");
+        logs.push("Ejemplo: DSPDBR FILE(QUSERPF)");
+        logs.push("Muestra las dependencias lógicas y físicas de un archivo.");
+        logs.push("======================================================================");
+      } else {
+        const fileExists = dbFiles.some(f => f.name === filename) || filename === "QUSERLF" || filename === "QRPGLF";
+        if (fileExists) {
+          logs.push("================ RELACIONES DE BASE DE DATOS (DSPDBR) ================");
+          logs.push(`Archivo principal consultado . . . . : QGPL/${filename}`);
+          logs.push("Biblioteca . . . . . . . . . . . . . : QGPL");
+          logs.push("");
+          if (filename === "QUSERPF") {
+            logs.push("Archivos lógicos dependientes registrados:");
+            logs.push("Librería     Archivo lógico     Tipo        Clave de acceso     Estado");
+            logs.push("----------   --------------     ---------   ---------------     -------");
+            logs.push("QGPL         QUSERLF            LOGICAL     ID (Ascendente)     ACTIVO");
+          } else if (filename === "QRPGPF") {
+            logs.push("Archivos lógicos dependientes registrados:");
+            logs.push("Librería     Archivo lógico     Tipo        Clave de acceso     Estado");
+            logs.push("----------   --------------     ---------   ---------------     -------");
+            logs.push("QGPL         QRPGLF             LOGICAL     ID (Ascendente)     ACTIVO");
+          } else {
+            logs.push("No hay archivos lógicos dependientes registrados para este archivo físico.");
+          }
+          logs.push("======================================================================");
+          checkMissionObjectives("DSPDBR");
+        } else {
+          logs.push(`[ERROR CL] El archivo '${filename}' no existe en la biblioteca de pruebas.`);
+        }
+      }
+    }
+    // DSPFD command - Descripción de archivo
+    else if (upperCmd.startsWith("DSPFD")) {
+      const match = trimmed.match(/FILE\((.*?)\)/i);
+      const filename = match ? match[1].toUpperCase() : trimmed.substring(5).trim().toUpperCase();
+      
+      if (!filename) {
+        logs.push("================ DESCRIPCIÓN DE ARCHIVO (DSPFD) ================");
+        logs.push("Uso: DSPFD FILE(nombre_archivo)");
+        logs.push("Ejemplo: DSPFD FILE(QUSERPF)");
+        logs.push("Muestra las características físicas o lógicas del archivo.");
+        logs.push("=================================================================");
+      } else {
+        const file = dbFiles.find(f => f.name === filename);
+        if (file) {
+          logs.push("================ DESCRIPCIÓN DE ARCHIVO (DSPFD) ================");
+          logs.push(`Archivo . . . . . . . . . . . . . . : ${filename}`);
+          logs.push("Biblioteca . . . . . . . . . . . . : QGPL");
+          logs.push("Tipo de archivo . . . . . . . . . . : *PHYSICAL");
+          logs.push("Atributo . . . . . . . . . . . . . : PF");
+          logs.push(`Nombre de formato de registro . . . : ${filename}R`);
+          logs.push(`Número de campos . . . . . . . . . : ${file.schema.length}`);
+          logs.push(`Longitud de registro (bytes) . . . : ${file.schema.length * 15}`);
+          logs.push("Número de miembros . . . . . . . . : 1");
+          logs.push(`Miembro actual . . . . . . . . . . : ${filename}`);
+          logs.push(`Número total de registros . . . . . : ${file.records.length}`);
+          logs.push(`Tamaño estimado del archivo (bytes) : ${file.records.length * file.schema.length * 15}`);
+          logs.push(`Ubicación en disco virtual . . . . . : SECTOR-${4096 + Math.floor(Math.random() * 200)}`);
+          logs.push("Creado por usuario . . . . . . . . : ALBERTO");
+          logs.push("=================================================================");
+          checkMissionObjectives("DSPFD");
+        } else if (filename === "QUSERLF") {
+          logs.push("================ DESCRIPCIÓN DE ARCHIVO (DSPFD) ================");
+          logs.push("Archivo . . . . . . . . . . . . . . : QUSERLF");
+          logs.push("Biblioteca . . . . . . . . . . . . : QGPL");
+          logs.push("Tipo de archivo . . . . . . . . . . : *LOGICAL");
+          logs.push("Atributo . . . . . . . . . . . . . : LF");
+          logs.push("Basado en archivo físico . . . . . : QUSERPF");
+          logs.push("Trayectoria de acceso . . . . . . . : CON LLAVE (*KEYED)");
+          logs.push("Claves especificadas . . . . . . . : ID (Ascendente)");
+          logs.push("Nombre de formato de registro . . . : QUSERLFR");
+          const pfFile = dbFiles.find(f => f.name === "QUSERPF");
+          logs.push(`Número total de registros dependientes: ${pfFile ? pfFile.records.length : 0}`);
+          logs.push("=================================================================");
+          checkMissionObjectives("DSPFD");
+        } else if (filename === "QRPGLF") {
+          logs.push("================ DESCRIPCIÓN DE ARCHIVO (DSPFD) ================");
+          logs.push("Archivo . . . . . . . . . . . . . . : QRPGLF");
+          logs.push("Biblioteca . . . . . . . . . . . . : QGPL");
+          logs.push("Tipo de archivo . . . . . . . . . . : *LOGICAL");
+          logs.push("Atributo . . . . . . . . . . . . . : LF");
+          logs.push("Basado en archivo físico . . . . . : QRPGPF");
+          logs.push("Trayectoria de acceso . . . . . . . : CON LLAVE (*KEYED)");
+          logs.push("Claves especificadas . . . . . . . : ID (Ascendente)");
+          logs.push("Nombre de formato de registro . . . : QRPGLFR");
+          const pfFile = dbFiles.find(f => f.name === "QRPGPF");
+          logs.push(`Número total de registros dependientes: ${pfFile ? pfFile.records.length : 0}`);
+          logs.push("=================================================================");
+          checkMissionObjectives("DSPFD");
+        } else {
+          logs.push(`[ERROR CL] El archivo '${filename}' no existe en la biblioteca de pruebas.`);
+        }
+      }
+    }
+    // DSPFFD command - Descripción de campos de archivo
+    else if (upperCmd.startsWith("DSPFFD")) {
+      const match = trimmed.match(/FILE\((.*?)\)/i);
+      const filename = match ? match[1].toUpperCase() : trimmed.substring(6).trim().toUpperCase();
+      
+      if (!filename) {
+        logs.push("================ DESCRIPCIÓN DE CAMPOS DE ARCHIVO (DSPFFD) ================");
+        logs.push("Uso: DSPFFD FILE(nombre_archivo)");
+        logs.push("Ejemplo: DSPFFD FILE(QUSERPF)");
+        logs.push("Muestra los tipos, longitudes y posiciones de los campos del archivo.");
+        logs.push("===========================================================================");
+      } else {
+        const file = dbFiles.find(f => f.name === filename);
+        if (file) {
+          logs.push("================ DESCRIPCIÓN DE CAMPOS DE ARCHIVO (DSPFFD) ================");
+          logs.push(`Archivo: ${filename}          Biblioteca: QGPL          Formato: ${filename}R`);
+          logs.push("");
+          logs.push("Campo       Tipo        Longitud  Pos. Buffer  Descripción");
+          logs.push("----------  ----------  --------  -----------  ---------------------------");
+          let currentPos = 1;
+          file.schema.forEach(field => {
+            let fieldType = "CHAR";
+            let fieldLen = 15;
+            let fieldDesc = "Campo de datos generales";
+            
+            if (field === "ID") {
+              fieldType = "ZONED(5,0)";
+              fieldLen = 5;
+              fieldDesc = "Identificador clave numérico";
+            } else if (field === "NAME" || field === "NOMBRE") {
+              fieldType = "CHAR(30)";
+              fieldLen = 30;
+              fieldDesc = "Nombre completo del usuario";
+            } else if (field === "DATETIME" || field === "FECHA") {
+              fieldType = "CHAR(19)";
+              fieldLen = 19;
+              fieldDesc = "Fecha y hora del registro";
+            } else if (field === "VALUE" || field === "VALOR") {
+              fieldType = "PACKED(10,2)";
+              fieldLen = 10;
+              fieldDesc = "Monto numérico decimal";
+            }
+            
+            logs.push(`${field.padEnd(10)}  ${fieldType.padEnd(10)}  ${String(fieldLen).padStart(8)}  ${String(currentPos).padStart(11)}  ${fieldDesc}`);
+            currentPos += fieldLen;
+          });
+          logs.push("===========================================================================");
+          checkMissionObjectives("DSPFFD");
+        } else if (filename === "QUSERLF" || filename === "QRPGLF") {
+          const basedOn = filename === "QUSERLF" ? "QUSERPF" : "QRPGPF";
+          logs.push("================ DESCRIPCIÓN DE CAMPOS DE ARCHIVO (DSPFFD) ================");
+          logs.push(`Archivo lógico: ${filename}   Biblioteca: QGPL          Formato: ${filename}R`);
+          logs.push(`Basado en el archivo físico principal: ${basedOn}`);
+          logs.push("");
+          logs.push("Campo       Tipo        Longitud  Pos. Buffer  Llave de Ordenación");
+          logs.push("----------  ----------  --------  -----------  -------------------");
+          let currentPos = 1;
+          const basedOnFile = dbFiles.find(f => f.name === basedOn);
+          const fields = basedOnFile ? basedOnFile.schema : ["ID", "NAME", "DATETIME"];
+          fields.forEach(field => {
+            let fieldType = field === "ID" ? "ZONED(5,0)" : field === "VALUE" ? "PACKED(10,2)" : field === "DATETIME" ? "CHAR(19)" : "CHAR(30)";
+            let fieldLen = field === "ID" ? 5 : field === "VALUE" ? 10 : field === "DATETIME" ? 19 : 30;
+            let isKey = field === "ID" ? "*YES (Clave principal)" : "*NO";
+            logs.push(`${field.padEnd(10)}  ${fieldType.padEnd(10)}  ${String(fieldLen).padStart(8)}  ${String(currentPos).padStart(11)}  ${isKey}`);
+            currentPos += fieldLen;
+          });
+          logs.push("===========================================================================");
+          checkMissionObjectives("DSPFFD");
+        } else {
+          logs.push(`[ERROR CL] El archivo '${filename}' no existe en la biblioteca de pruebas.`);
+        }
+      }
+    }
+    // FNDSTRPDM command - Buscar cadena en miembros
+    else if (upperCmd.startsWith("FNDSTRPDM")) {
+      let searchStr = "";
+      const stringMatch = trimmed.match(/STRING\(['"](.*?)['"]\)/i) || trimmed.match(/STRING\((.*?)\)/i);
+      
+      if (stringMatch) {
+        searchStr = stringMatch[1];
+      } else {
+        const parts = trimmed.split(/\s+/);
+        if (parts.length > 1) {
+          const remaining = trimmed.substring(trimmed.indexOf(parts[1]));
+          searchStr = remaining.replace(/['"]/g, "").trim();
+        }
+      }
+      
+      if (!searchStr) {
+        logs.push("================ BUSCAR CADENA CON PDM (FNDSTRPDM) ================");
+        logs.push("Uso: FNDSTRPDM STRING('texto_buscar') FILE(QGPL/QCLSRC)");
+        logs.push("O de forma abreviada: FNDSTRPDM 'texto_buscar'");
+        logs.push("Busca texto o código dentro de todos los miembros fuente de la biblioteca.");
+        logs.push("===================================================================");
+      } else {
+        logs.push("================ BUSCAR CADENA CON PDM (FNDSTRPDM) ================");
+        logs.push("Biblioteca de búsqueda . . . : QGPL");
+        logs.push("Archivo de código fuente . . : *ALLSRC");
+        logs.push(`Cadena de búsqueda . . . . . : '${searchStr}'`);
+        logs.push("");
+        logs.push("Miembro     Tipo    Línea   Contenido de la línea de código");
+        logs.push("----------  ------  -----   -------------------------------------------------------");
+        
+        let matchCount = 0;
+        members.forEach(m => {
+          if (m.code) {
+            const lines = m.code.split("\n");
+            lines.forEach((line, idx) => {
+              if (line.toLowerCase().includes(searchStr.toLowerCase())) {
+                const lineNum = String((idx + 1) * 10).padStart(4, "0");
+                logs.push(`${m.name.padEnd(10)}  ${m.type.padEnd(6)}  ${lineNum}    ${line.substring(0, 55)}`);
+                matchCount++;
+              }
+            });
+          }
+        });
+        
+        if (matchCount === 0) {
+          logs.push(`*** [INFORMACIÓN] No se encontraron coincidencias para la cadena '${searchStr}'. ***`);
+        } else {
+          logs.push(`*** TOTAL COINCIDENCIAS ENCONTRADAS EN LA BIBLIOTECA: ${matchCount} ***`);
+        }
+        logs.push("====================================================================================");
+        checkMissionObjectives("FNDSTRPDM");
+      }
+    }
+    // CPYF command - Copiar archivo
+    else if (upperCmd.startsWith("CPYF")) {
+      const fromMatch = trimmed.match(/FROMFILE\((.*?)\)/i);
+      const toMatch = trimmed.match(/TOFILE\((.*?)\)/i);
+      
+      let fromFile = fromMatch ? fromMatch[1].toUpperCase() : "";
+      let toFile = toMatch ? toMatch[1].toUpperCase() : "";
+      
+      if (!fromFile || !toFile) {
+        const parts = trimmed.split(/\s+/);
+        if (parts.length >= 3) {
+          fromFile = parts[1].toUpperCase();
+          toFile = parts[2].toUpperCase();
+        }
+      }
+      
+      if (!fromFile || !toFile) {
+        logs.push("================ COPIAR ARCHIVOS DE BASE DE DATOS (CPYF) ================");
+        logs.push("Uso: CPYF FROMFILE(archivo_origen) TOFILE(archivo_destino) MBROPT(*ADD)");
+        logs.push("Abreviado: CPYF origen destino");
+        logs.push("Permite duplicar estructuras y registros de tablas en DB2/400.");
+        logs.push("=========================================================================");
+      } else {
+        const sourceFile = dbFiles.find(f => f.name === fromFile);
+        if (sourceFile) {
+          const targetExists = dbFiles.some(f => f.name === toFile);
+          if (targetExists) {
+            const updated = dbFiles.map(f => {
+              if (f.name === toFile) {
+                return {
+                  ...f,
+                  records: [...f.records, ...sourceFile.records]
+                };
+              }
+              return f;
+            });
+            setDbFiles(updated);
+            logs.push(`[SISTEMA] Registros copiados desde '${fromFile}' hacia archivo existente '${toFile}'.`);
+            logs.push(`[SISTEMA] Se agregaron ${sourceFile.records.length} registros exitosamente.`);
+          } else {
+            const newFileObj = {
+              name: toFile,
+              schema: [...sourceFile.schema],
+              records: JSON.parse(JSON.stringify(sourceFile.records))
+            };
+            setDbFiles(prev => [...prev, newFileObj]);
+            logs.push(`[SISTEMA] El archivo físico de destino '${toFile}' no existía. Se ha creado.`);
+            logs.push(`[SISTEMA] Se copió la estructura completa de campos: ${sourceFile.schema.join(", ")}`);
+            logs.push(`[SISTEMA] Se copiaron con éxito ${sourceFile.records.length} registros hacia '${toFile}'.`);
+          }
+          checkMissionObjectives("CPYF");
+        } else {
+          logs.push(`[ERROR CL] El archivo de origen '${fromFile}' no existe en la biblioteca.`);
+        }
+      }
+    }
+    // DSPRPG command - Manual Completo de RPG en Español
+    else if (upperCmd === "DSPRPG" || upperCmd.startsWith("DSPRPG ")) {
+      const option = trimmed.substring(6).trim();
+      
+      if (!option) {
+        logs.push("================ MANUAL DEL COMPILADOR RPG - AS/400 ================");
+        logs.push("Seleccione un capítulo ingresando 'DSPRPG [Número]':");
+        logs.push("");
+        logs.push("  DSPRPG 1 - Hojas de Especificaciones RPG (H, F, E, I, C, O)");
+        logs.push("  DSPRPG 2 - El Ciclo de Lógica de Ejecución RPG");
+        logs.push("  DSPRPG 3 - El Uso de Indicadores de Estado (01-99, LR, L1-L9)");
+        logs.push("  DSPRPG 4 - La Operación SETLL (Set Lower Limit) y READE");
+        logs.push("");
+        logs.push("Ingrese 'DSPRPG 1' para empezar la lectura.");
+        logs.push("=====================================================================");
+      } else if (option === "1") {
+        logs.push("============== RPG MANUAL: 1. HOJAS DE ESPECIFICACIONES ==============");
+        logs.push("El RPG es un lenguaje posicional histórico. Cada instrucción debe ir");
+        logs.push("escrita en una columna específica según su tipo de especificación (Hoja):");
+        logs.push("");
+        logs.push(" 1. Hoja 'H' (Header / Control): Controla parámetros globales del compilador");
+        logs.push("    y del entorno de ejecución (ej. formato de fecha, optimizaciones).");
+        logs.push(" 2. Hoja 'F' (File Description): Define los archivos (tablas) lógicos o físicos");
+        logs.push("    que utilizará el programa, su dirección (Input, Output, Update) y llave.");
+        logs.push(" 3. Hoja 'E' (Extension/Arrays): Define vectores, tablas internas, matrices");
+        logs.push("    y archivos de extensión (parámetros precargados).");
+        logs.push(" 4. Hoja 'I' (Input): Describe la estructura de los campos de entrada,");
+        logs.push("    renombra buffers de datos y asocia indicadores de registro.");
+        logs.push(" 5. Hoja 'C' (Calculation): Contiene las instrucciones lógicas reales,");
+        logs.push("    operaciones matemáticas, comparaciones (SETLL, READ, ADD, SUB, etc.).");
+        logs.push(" 6. Hoja 'O' (Output): Describe el formato de los listados de impresora,");
+        logs.push("    pantallas de salida o registros a escribir.");
+        logs.push("");
+        logs.push("Escriba 'DSPRPG 2' para continuar con el Ciclo Lógico.");
+        logs.push("=======================================================================");
+      } else if (option === "2") {
+        logs.push("============== RPG MANUAL: 2. EL CICLO LÓGICO DEL RPG ==============");
+        logs.push("A diferencia de lenguajes procedimentales, RPG tiene un bucle o ciclo");
+        logs.push("de ejecución nativo e implícito, ideal para procesamiento de reportes:");
+        logs.push("");
+        logs.push(" Pasos del Ciclo RPG:");
+        logs.push("  1. Abre archivos especificados en la Hoja 'F'.");
+        logs.push("  2. Lee el primer o siguiente registro del archivo principal.");
+        logs.push("  3. Si es Fin de Archivo (EOF), activa el indicador *LR (Last Record) y termina.");
+        logs.push("  4. Si hay datos, carga los campos en el buffer (Hoja 'I').");
+        logs.push("  5. Procesa las operaciones de cálculo especificadas en la Hoja 'C'.");
+        logs.push("  6. Escribe salidas correspondientes (Hoja 'O').");
+        logs.push("  7. Vuelve al paso 2.");
+        logs.push("");
+        logs.push("Escriba 'DSPRPG 3' para continuar con el Uso de Indicadores.");
+        logs.push("=====================================================================");
+      } else if (option === "3") {
+        logs.push("============== RPG MANUAL: 3. EL USO DE INDICADORES (01-99) ==============");
+        logs.push("Los indicadores son variables booleanas de un solo dígito de estado:");
+        logs.push("");
+        logs.push(" - Indicadores de cálculo (01-99): Pueden activarse (*ON) o desactivarse (*OFF)");
+        logs.push("   en base a condiciones matemáticas o lógicas (ej: comparar campos).");
+        logs.push(" - Indicadores especiales:");
+        logs.push("    * *LR (Last Record): Indica fin de programa y cierra buffers.");
+        logs.push("    * *L1-*L9 (Control Levels): Utilizados para rupturas de control (subtotales).");
+        logs.push("    * *OF (Overflow): Indica desbordamiento de página física en impresora.");
+        logs.push(" - Condicionamiento de líneas:");
+        logs.push("   En la Hoja 'C', puedes poner el número del indicador (ej. '05') al inicio de");
+        logs.push("   la línea para que esa instrucción solo se ejecute si dicho indicador está encendido.");
+        logs.push("");
+        logs.push("Escriba 'DSPRPG 4' para continuar con la Operación SETLL.");
+        logs.push("==========================================================================");
+      } else if (option === "4") {
+        logs.push("============== RPG MANUAL: 4. LA OPERACIÓN SETLL Y READE ==============");
+        logs.push("SETLL (Set Lower Limit) es crucial para buscar datos en base de datos:");
+        logs.push("");
+        logs.push(" - Función:");
+        logs.push("   Coloca el puntero del archivo justo al principio del primer registro que");
+        logs.push("   coincida o sea mayor que la clave especificada, pero NO lee el registro.");
+        logs.push(" - Sintaxis típica Hoja 'C':");
+        logs.push("      CL0N01Factor1+++++++Opcode&ExtFactor2+++++++Result++++++++Indicator");
+        logs.push("      C     KEY_VAL       SETLL     MYFILE_LF                  50 (Equal)");
+        logs.push("");
+        logs.push(" - Resultados de Indicadores en SETLL:");
+        logs.push("   * El indicador del factor de resultado (ej. 50) se enciende si se encuentra");
+        logs.push("     un registro cuya clave sea EXACTAMENTE igual a la buscada.");
+        logs.push(" - Operaciones sucesivas:");
+        logs.push("   Normalmente va seguido de un bucle de lectura READE (Read Equal):");
+        logs.push("      C     KEY_VAL       READE     MYFILE_LF                  55 (EOF)");
+        logs.push("   Esto lee secuencialmente todos los registros que tienen exactamente la misma clave.");
+        logs.push("");
+        logs.push("Felicidades. Ha finalizado de leer el manual introductorio.");
+        logs.push("=========================================================================");
+      } else {
+        logs.push(`[ERROR] Capítulo '${option}' no reconocido. Ingrese un número de 1 a 4.`);
+      }
+      checkMissionObjectives("DSPRPG");
     } 
     // 6. CALL program
     else if (upperCmd.startsWith("CALL ")) {
@@ -1050,6 +1432,34 @@ export default function App() {
       }
       if (actionType === "SNDMSG") {
         updatedProgress[3] = true;
+      }
+    }
+
+    if (activeMission.id === "M_DB2_1") {
+      // Objectives:
+      // 0. Ejecuta 'DSPDBR FILE(QUSERPF)' para visualizar las relaciones lógicas.
+      // 1. Ejecuta 'DSPFD FILE(QUSERPF)' para analizar la descripción del archivo físico.
+      // 2. Ejecuta 'DSPFFD FILE(QUSERPF)' para inspeccionar el búfer de campos.
+      // 3. Usa 'FNDSTRPDM SALUDO' para buscar coincidencias de texto en el código fuente.
+      // 4. Usa 'CPYF FROMFILE(QUSERPF) TOFILE(QUSERPF_RESP)' para crear un respaldo físico.
+      // 5. Escribe 'DSPRPG' y navega por el manual interactivo de hojas, ciclo y SETLL.
+      if (actionType === "DSPDBR") {
+        updatedProgress[0] = true;
+      }
+      if (actionType === "DSPFD") {
+        updatedProgress[1] = true;
+      }
+      if (actionType === "DSPFFD") {
+        updatedProgress[2] = true;
+      }
+      if (actionType === "FNDSTRPDM") {
+        updatedProgress[3] = true;
+      }
+      if (actionType === "CPYF") {
+        updatedProgress[4] = true;
+      }
+      if (actionType === "DSPRPG") {
+        updatedProgress[5] = true;
       }
     }
 

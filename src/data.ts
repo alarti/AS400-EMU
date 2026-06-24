@@ -228,5 +228,34 @@ WRKACTJOB`,
       "Los comandos CL son el lenguaje de control del iSeries. No requieren compilación para probarse si se ejecutan directo en la línea de mandatos.",
       "Escribe 'WRKMBRPDM' en la consola principal para ir directo al gestor de desarrollo."
     ]
+  },
+  {
+    id: "M_DB2_1",
+    title: "Gestión de Datos y Programación RPG",
+    difficulty: "Avanzado",
+    description: "Aprende a analizar estructuras físicas y lógicas con DSPDBR, DSPFD, DSPFFD, buscar texto con FNDSTRPDM, copiar archivos con CPYF, y consultar el manual de RPG.",
+    language: "RPG",
+    objectives: [
+      "Ejecuta 'DSPDBR FILE(QUSERPF)' para visualizar las relaciones lógicas.",
+      "Ejecuta 'DSPFD FILE(QUSERPF)' para analizar la descripción del archivo físico.",
+      "Ejecuta 'DSPFFD FILE(QUSERPF)' para inspeccionar el búfer de campos.",
+      "Usa 'FNDSTRPDM SALUDO' para buscar coincidencias de texto en el código fuente.",
+      "Usa 'CPYF FROMFILE(QUSERPF) TOFILE(QUSERPF_RESP)' para crear un respaldo físico.",
+      "Escribe 'DSPRPG' y navega por el manual interactivo de hojas, ciclo y SETLL."
+    ],
+    templateCode: `/* Comandos de Análisis DB2 y RPG */
+DSPDBR FILE(QUSERPF)
+DSPFD FILE(QUSERPF)
+DSPFFD FILE(QUSERPF)
+FNDSTRPDM SALUDO
+CPYF FROMFILE(QUSERPF) TOFILE(QUSERPF_RESP)
+DSPRPG`,
+    srcFile: "QCLSRC",
+    memberName: "MANEJODB2",
+    hints: [
+      "Los mandatos DSPDBR, DSPFD y DSPFFD proporcionan el catálogo de metadatos más completo de DB2/400.",
+      "Usa CPYF para duplicar tablas completas o añadir registros de datos entre bibliotecas de iSeries.",
+      "Escribe DSPRPG seguido de un capítulo (1, 2, 3 o 4) para estudiar temas específicos como el ciclo de lógica y la instrucción SETLL."
+    ]
   }
 ];
