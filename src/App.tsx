@@ -41,6 +41,15 @@ export default function App() {
   // 1 = Main 5250 Terminal, 2 = SEU Editor, 3 = DB2 Database, 4 = Training Missions, 5 = Legacy Bridge, 6 = Acerca de / GitHub README
   const [activeTab, setActiveTab] = useState<number>(1);
   const [currentUser, setCurrentUser] = useState<string>("QSECOFR");
+  const [isLoggedOn, setIsLoggedOn] = useState<boolean>(false);
+  const [loginUser, setLoginUser] = useState<string>("QSECOFR");
+  const [loginPassword, setLoginPassword] = useState<string>("QSECOFR");
+  const [loginProgram, setLoginProgram] = useState<string>("");
+  const [loginMenu, setLoginMenu] = useState<string>("MAIN");
+  const [loginLibrary, setLoginLibrary] = useState<string>("QGPL");
+  const [loginError, setLoginError] = useState<string>("");
+  const [userProfiles, setUserProfiles] = useState<string[]>(["QSECOFR", "QSYSOPR", "QSYS", "QUSER", "DEVELOPER", "ALBERTO"]);
+  const [libraryList, setLibraryList] = useState<string[]>(["QSYS", "QGPL", "QTEMP"]);
   const [s36Mode, setS36Mode] = useState<boolean>(false);
   const [s36CurrentLib, setS36CurrentLib] = useState<string>("SYSTEM36");
   const [s36LoadedProgram, setS36LoadedProgram] = useState<string | null>(null);
@@ -495,14 +504,266 @@ export default function App() {
       
       checkMissionObjectives("SNDMSG");
     }
-    // 8. SIGNOFF
-    else if (upperCmd === "SIGNOFF" || upperCmd === "BYE") {
-      const newUser = currentUser === "QSECOFR" ? "DEVELOPER" : "QSECOFR";
-      setCurrentUser(newUser);
-      logs.push(`[SESIÓN] El usuario anterior cerró sesión.`);
-      logs.push(`[SESIÓN] Iniciando sesión automática con perfil: ${newUser}`);
+    // 8. DSPSYSVAL
+    else if (upperCmd.startsWith("DSPSYSVAL")) {
+      const match = trimmed.match(/SYSVAL\((.*?)\)/i);
+      const sysval = match ? match[1].toUpperCase() : trimmed.substring(9).trim().toUpperCase();
+      
+      if (!sysval) {
+        logs.push("================ VALORES DE SISTEMA OS/400 VIRTUAL ================");
+        logs.push("QDATE       - Fecha del sistema (" + systemStatus.localTime.substring(0, 10) + ")");
+        logs.push("QTIME       - Hora del sistema (" + systemStatus.localTime.substring(11, 19) + ")");
+        logs.push("QSECURITY   - Nivel de seguridad del sistema (40 - Seguridad de Recursos)");
+        logs.push("QPRTDEV     - Dispositivo de impresión predeterminado (PRT01)");
+        logs.push("QCCSID      - Identificador de juego de caracteres codificado (37 - EBCDIC)");
+        logs.push("QSRLNBR     - Número de serie del sistema virtual (44A1234B)");
+        logs.push("QMAXSIGN    - Intentos máximos permitidos de inicio de sesión (3)");
+        logs.push("Escriba 'DSPSYSVAL SYSVAL(nombre)' para inspeccionar un valor individual.");
+        logs.push("===================================================================");
+      } else {
+        logs.push(`================ VALOR DE SISTEMA OS/400: ${sysval} ================`);
+        if (sysval === "QDATE") {
+          logs.push(`Valor . . . . . . . . . . :  ${systemStatus.localTime.substring(0, 10)}`);
+          logs.push("Descripción . . . . . . . :  Fecha actual del sistema.");
+        } else if (sysval === "QTIME") {
+          logs.push(`Valor . . . . . . . . . . :  ${systemStatus.localTime.substring(11, 19)}`);
+          logs.push("Descripción . . . . . . . :  Hora actual del sistema.");
+        } else if (sysval === "QSECURITY") {
+          logs.push("Valor . . . . . . . . . . :  40");
+          logs.push("Descripción . . . . . . . :  Nivel de seguridad del sistema.");
+        } else if (sysval === "QPRTDEV") {
+          logs.push("Valor . . . . . . . . . . :  PRT01");
+          logs.push("Descripción . . . . . . . :  Impresora predeterminada.");
+        } else if (sysval === "QCCSID") {
+          logs.push("Valor . . . . . . . . . . :  37");
+          logs.push("Descripción . . . . . . . :  EBCDIC US English.");
+        } else if (sysval === "QSRLNBR") {
+          logs.push("Valor . . . . . . . . . . :  44A1234B");
+          logs.push("Descripción . . . . . . . :  Número de serie del procesador.");
+        } else if (sysval === "QMAXSIGN") {
+          logs.push("Valor . . . . . . . . . . :  3");
+          logs.push("Descripción . . . . . . . :  Intentos de contraseña máximos.");
+        } else {
+          logs.push(`Valor . . . . . . . . . . :  *NOTFOUND`);
+          logs.push(`[ERROR CL] El valor de sistema '${sysval}' no es válido o no está soportado.`);
+        }
+        logs.push("=========================================================================");
+      }
     }
-    // 9. CLEAR
+    // 9. WRKUSRPRF / CRTUSRPRF / DSPUSRPRF
+    else if (upperCmd === "WRKUSRPRF") {
+      logs.push("================ TRABAJAR CON PERFILES DE USUARIO ================");
+      logs.push("Perfil      Clase de Usr  Estado     Bib. Inicial  Descripción");
+      logs.push("----------  ------------  ---------  ------------  ----------------------");
+      userProfiles.forEach(usr => {
+        const pClass = usr === "QSECOFR" || usr === "ALBERTO" ? "*SECADM" : usr === "QSYSOPR" ? "*SYSOPR" : usr === "DEVELOPER" ? "*PGMR" : "*USER";
+        logs.push(`${usr.padEnd(10)}  ${pClass.padEnd(12)}  *ACTIVE    QGPL        Usuario simulado de iSeries`);
+      });
+      logs.push("Use 'CRTUSRPRF USRPRF(nombre)' para crear un nuevo perfil.");
+      logs.push("==================================================================");
+    }
+    else if (upperCmd.startsWith("CRTUSRPRF ")) {
+      const match = trimmed.match(/USRPRF\((.*?)\)/i);
+      const newUsr = (match ? match[1] : trimmed.substring(10).trim()).toUpperCase().replace(/[^A-Z0-9]/g, "");
+      
+      if (!newUsr) {
+        logs.push("[ERROR CL] Debe especificar un nombre de perfil. Ej: CRTUSRPRF USRPRF(ALEX)");
+      } else if (userProfiles.includes(newUsr)) {
+        logs.push(`[ERROR CL] El perfil de usuario '${newUsr}' ya existe en el sistema.`);
+      } else {
+        setUserProfiles(prev => [...prev, newUsr]);
+        logs.push(`[SISTEMA] Perfil de usuario '${newUsr}' creado con éxito (Clase: *USER).`);
+        logs.push(`[SISTEMA] Biblioteca asociada: QGPL, Menú inicial: MAIN.`);
+      }
+    }
+    else if (upperCmd.startsWith("DSPUSRPRF ")) {
+      const match = trimmed.match(/USRPRF\((.*?)\)/i);
+      const usr = match ? match[1].toUpperCase() : trimmed.substring(10).trim().toUpperCase();
+      const targetUsr = usr || currentUser;
+      
+      if (userProfiles.includes(targetUsr)) {
+        logs.push(`================ PERFIL DE USUARIO: ${targetUsr} ================`);
+        logs.push(`Clase de usuario . . . . . :  ${targetUsr === "QSECOFR" || targetUsr === "ALBERTO" ? "*SECADM" : targetUsr === "QSYSOPR" ? "*SYSOPR" : "*PGMR"}`);
+        logs.push(`Biblioteca inicial . . . . :  QGPL`);
+        logs.push(`Menú inicial . . . . . . . :  MAIN`);
+        logs.push(`Estado del perfil . . . .  :  *ENABLED`);
+        logs.push(`Dirección de correo . . .  :  ${targetUsr.toLowerCase()}@pub400-lcl.com`);
+        logs.push("=================================================================");
+      } else {
+        logs.push(`[ERROR CL] El perfil de usuario '${targetUsr}' no existe.`);
+      }
+    }
+    // 10. WRKOBJ & DSPLIB / ADDLIBLE / RMVLIBLE
+    else if (upperCmd === "WRKOBJ") {
+      logs.push("================ TRABAJAR CON OBJETOS DEL SISTEMA ================");
+      logs.push("Objeto      Biblioteca  Tipo        Atributo    Descripción");
+      logs.push("----------  ----------  ----------  ----------  ----------------------");
+      dbFiles.forEach(file => {
+        logs.push(`${file.name.padEnd(10)}  QGPL        *FILE       PF          Archivo Físico (Physical File)`);
+      });
+      members.forEach(mbr => {
+        logs.push(`${mbr.name.padEnd(10)}  QGPL        *MBR        ${mbr.type.padEnd(10)} Miembro fuente de código`);
+      });
+      logs.push("==================================================================");
+    }
+    else if (upperCmd.startsWith("DSPLIB")) {
+      const match = trimmed.match(/LIB\((.*?)\)/i);
+      const lib = (match ? match[1] : trimmed.substring(6).trim()).toUpperCase() || "QGPL";
+      
+      logs.push(`================ BIBLIOTECA DEL SISTEMA: ${lib} ================`);
+      if (lib === "QGPL") {
+        dbFiles.forEach(file => {
+          logs.push(`${file.name.padEnd(12)} *FILE       PF          Registros: ${file.records.length}`);
+        });
+        members.forEach(mbr => {
+          logs.push(`${mbr.name.padEnd(12)} *MBR        ${mbr.type.padEnd(11)} Compilado: ${mbr.compiled ? "SÍ" : "NO"}`);
+        });
+      } else if (lib === "QSYS") {
+        logs.push("QSYSOPR      *MSGQ       Cola de mensajes del operador");
+        logs.push("QINTER       *SBSD       Subsistema interactivo principal");
+        logs.push("QBATCH       *SBSD       Subsistema de procesamiento por lotes");
+      } else if (lib === "QTEMP") {
+        logs.push("[VACÍO] No hay objetos temporales asignados a este hilo.");
+      } else {
+        logs.push(`[ERROR CL] La biblioteca '${lib}' no está registrada en la lista de bibliotecas.`);
+      }
+      logs.push("==================================================================");
+    }
+    else if (upperCmd.startsWith("ADDLIBLE ")) {
+      const match = trimmed.match(/LIB\((.*?)\)/i);
+      const lib = (match ? match[1] : trimmed.substring(9).trim()).toUpperCase();
+      
+      if (!lib) {
+        logs.push("[ERROR CL] Especifique la biblioteca. Ej: ADDLIBLE LIB(QTEMP)");
+      } else if (libraryList.includes(lib)) {
+        logs.push(`[ERROR CL] La biblioteca '${lib}' ya está en la lista de bibliotecas.`);
+      } else {
+        setLibraryList(prev => [...prev, lib]);
+        logs.push(`[SISTEMA] Biblioteca '${lib}' agregada exitosamente a la lista de bibliotecas.`);
+      }
+    }
+    else if (upperCmd.startsWith("RMVLIBLE ")) {
+      const match = trimmed.match(/LIB\((.*?)\)/i);
+      const lib = (match ? match[1] : trimmed.substring(9).trim()).toUpperCase();
+      
+      if (!lib) {
+        logs.push("[ERROR CL] Especifique la biblioteca. Ej: RMVLIBLE LIB(QTEMP)");
+      } else if (!libraryList.includes(lib)) {
+        logs.push(`[ERROR CL] La biblioteca '${lib}' no está en la lista de bibliotecas.`);
+      } else if (lib === "QSYS" || lib === "QGPL") {
+        logs.push(`[ERROR CL] No se permite eliminar bibliotecas de sistema base (${lib}).`);
+      } else {
+        setLibraryList(prev => prev.filter(l => l !== lib));
+        logs.push(`[SISTEMA] Biblioteca '${lib}' eliminada de la lista de bibliotecas.`);
+      }
+    }
+    // 11. DSPJOBLOG
+    else if (upperCmd === "DSPJOBLOG") {
+      logs.push("================ LOG DE TRABAJO ACTIVO (JOB LOG) ================");
+      logs.push(`Trabajo: DSP01        Usuario: ${currentUser}      Sistema: PUB400-LCL`);
+      logs.push("-".repeat(70));
+      if (commandHistory.length === 0) {
+        logs.push("[SISTEMA] No hay mandatos registrados en el historial de hilos.");
+      } else {
+        [...commandHistory].reverse().forEach((cmd, idx) => {
+          logs.push(`CMD${String(idx+1).padStart(3, "0")}  > ${cmd}`);
+        });
+      }
+      logs.push("=================================================================");
+    }
+    // 12. WRKMSG & SNDBRKMSG
+    else if (upperCmd === "WRKMSG") {
+      logs.push("================ COLA DE MENSAJES DE OPERADOR (QSYSOPR) ================");
+      if (messages.length === 0) {
+        logs.push("[INFORMACIÓN] No hay mensajes pendientes en la cola.");
+      } else {
+        messages.forEach(msg => {
+          logs.push(`[${msg.timestamp}] [${msg.type}] de ${msg.sender}: ${msg.text}`);
+        });
+      }
+      logs.push("=======================================================================");
+    }
+    else if (upperCmd.startsWith("SNDBRKMSG ")) {
+      const matchMsg = trimmed.match(/MSG\(['"](.*?)['"]\)/i);
+      const matchUsr = trimmed.match(/TOUSR\((.*?)\)/i);
+      
+      const msgText = matchMsg ? matchMsg[1] : trimmed.substring(10).trim();
+      const targetUsr = matchUsr ? matchUsr[1].toUpperCase() : "QSECOFR";
+      
+      const newMsg: SystemMessage = {
+        id: `M_BRK_${Date.now()}`,
+        timestamp: new Date().toISOString().replace('T', ' ').substring(11, 19),
+        type: "BREAK",
+        sender: currentUser,
+        text: msgText
+      };
+      setMessages([newMsg, ...messages]);
+      
+      logs.push(`*** MENSAJE DE INTERRUPCIÓN (BREAK) ENVIADO A ${targetUsr} ***`);
+      logs.push(`[BREAK] ${currentUser}: ${msgText}`);
+    }
+    // 13. Menus (GO MAIN, option numbers)
+    else if (upperCmd === "GO" || upperCmd === "GO MAIN") {
+      logs.push("=============================================================================");
+      logs.push("                       Menú Principal de AS/400 (MAIN)                       ");
+      logs.push("                                                             Sistema: PUB400-LCL");
+      logs.push(" Seleccione una de las siguientes opciones:                                  ");
+      logs.push("                                                                             ");
+      logs.push("   1. Tareas del Terminal 5250 (Consola Interactiva CL)                      ");
+      logs.push("   2. Administrador de Programas PDM (Editar RPG/COBOL)                      ");
+      logs.push("   3. Trabajar con Bases de Datos DB2/400 (SQL)                              ");
+      logs.push("   4. Centro de Entrenamiento y Misiones Cognitivas                          ");
+      logs.push("   5. Administración de Integraciones Legacy (SST / Puentes)                 ");
+      logs.push("   6. Acerca de este Emulador (GitHub README / Autoría)                      ");
+      logs.push("                                                                             ");
+      logs.push("   90. Cerrar Sesión Activa (SIGNOFF)                                        ");
+      logs.push("                                                                             ");
+      logs.push(" Escriba el número de opción o cualquier comando CL en la línea de mandatos. ");
+      logs.push("=============================================================================");
+    }
+    else if (upperCmd === "1") {
+      logs.push("[SISTEMA] Opción 1 seleccionada. Permanece en la Terminal Interactiva 5250.");
+    }
+    else if (upperCmd === "2") {
+      logs.push("[SISTEMA] Opción 2 seleccionada. Redirigiendo al Editor SEU / PDM.");
+      setActiveTab(2);
+    }
+    else if (upperCmd === "3") {
+      logs.push("[SISTEMA] Opción 3 seleccionada. Redirigiendo al Gestor DB2/400.");
+      setActiveTab(3);
+    }
+    else if (upperCmd === "4") {
+      logs.push("[SISTEMA] Opción 4 seleccionada. Redirigiendo al Centro de Entrenamiento.");
+      setActiveTab(4);
+    }
+    else if (upperCmd === "5") {
+      logs.push("[SISTEMA] Opción 5 seleccionada. Redirigiendo a Integración Legacy.");
+      setActiveTab(5);
+    }
+    else if (upperCmd === "6") {
+      logs.push("[SISTEMA] Opción 6 seleccionada. Redirigiendo a Acerca de / README.");
+      setActiveTab(6);
+    }
+    else if (upperCmd === "90") {
+      setIsLoggedOn(false);
+      setTerminalLogs([
+        "SESIÓN CERRADA POR EL USUARIO.",
+        "===>"
+      ]);
+      setTerminalInput("");
+      return;
+    }
+    // 14. SIGNOFF
+    else if (upperCmd === "SIGNOFF" || upperCmd === "BYE") {
+      setIsLoggedOn(false);
+      setTerminalLogs([
+        "SESIÓN CERRADA POR EL USUARIO.",
+        "===>"
+      ]);
+      setTerminalInput("");
+      return;
+    }
+    // 15. CLEAR
     else if (upperCmd === "CLEAR") {
       setTerminalLogs(["CONSOLA REINICIADA", "===>"]);
       setTerminalInput("");
@@ -850,6 +1111,38 @@ export default function App() {
     }
   };
 
+  // Handle Sign-on screen submission
+  const handleSignOnSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginUser.trim()) {
+      setLoginError("Introduzca el nombre de usuario.");
+      return;
+    }
+    const userUpper = loginUser.trim().toUpperCase();
+    
+    // Add user automatically to simulated profiles if not exists
+    if (!userProfiles.includes(userUpper)) {
+      setUserProfiles(prev => [...prev, userUpper]);
+    }
+    
+    setCurrentUser(userUpper);
+    setIsLoggedOn(true);
+    setLoginError("");
+    
+    // Setup fresh logs
+    setTerminalLogs([
+      "SISTEMA OPERATIVO IBM OS/400 V5R4M0 INICIADO CORRECTAMENTE.",
+      "LICENCIA DE SOFTWARE (C) COPYRIGHT IBM CORP. 1980, 2026.",
+      `[SESIÓN] Sesión iniciada con éxito por el usuario ${userUpper}.`,
+      "[SESIÓN] Estación de trabajo asignada: DSP01, Subsistema: QINTER.",
+      `[SESIÓN] Menú inicial: ${loginMenu.toUpperCase() || "MAIN"}, Biblioteca corriente: ${loginLibrary.toUpperCase() || "QGPL"}.`,
+      "Escriba 'HELP' o 'GO MAIN' para empezar a navegar el sistema interactivo.",
+      "===>"
+    ]);
+    
+    addActiveJob("INTERACTIVE", userUpper, "RUN", 0.5, "DSP01-LOGN");
+  };
+
   // Create empty member helper
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberType, setNewMemberType] = useState<"RPG" | "COBOL" | "CL">("RPG");
@@ -909,7 +1202,7 @@ export default function App() {
           <span className="text-[#fbbf24]">■</span> iSeries AS/400 & S/36 Emulator | por Alberto Arce <span className="text-[#fbbf24]">■</span>
         </div>
         <div className="flex items-center justify-end gap-4">
-          <div>Usuario: <span className="text-[#60a5fa] font-bold">{currentUser}</span></div>
+          <div>Usuario: <span className={isLoggedOn ? "text-[#60a5fa] font-bold" : "text-[#ff453a] font-bold"}>{isLoggedOn ? currentUser : "DESCONECTADO"}</span></div>
           <span className="text-[#2c2c2e]">|</span>
           <div className="flex items-center gap-1.5 text-white">
             <Clock className="w-3.5 h-3.5 text-[#fbbf24]" />
@@ -936,7 +1229,14 @@ export default function App() {
           
           <button 
             id="btn-nav-seu"
-            onClick={() => setActiveTab(2)}
+            onClick={() => {
+              if (!isLoggedOn) {
+                alert("DEBE INICIAR SESIÓN: Utilice la pantalla de Sign On en el Terminal 5250.");
+                setActiveTab(1);
+                return;
+              }
+              setActiveTab(2);
+            }}
             className={`px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${
               activeTab === 2 
                 ? "bg-[#1c1c1e] text-[#fbbf24] border-b-2 border-[#fbbf24]" 
@@ -949,7 +1249,14 @@ export default function App() {
 
           <button 
             id="btn-nav-db2"
-            onClick={() => setActiveTab(3)}
+            onClick={() => {
+              if (!isLoggedOn) {
+                alert("DEBE INICIAR SESIÓN: Utilice la pantalla de Sign On en el Terminal 5250.");
+                setActiveTab(1);
+                return;
+              }
+              setActiveTab(3);
+            }}
             className={`px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${
               activeTab === 3 
                 ? "bg-[#1c1c1e] text-[#fbbf24] border-b-2 border-[#fbbf24]" 
@@ -962,7 +1269,14 @@ export default function App() {
 
           <button 
             id="btn-nav-tutorials"
-            onClick={() => setActiveTab(4)}
+            onClick={() => {
+              if (!isLoggedOn) {
+                alert("DEBE INICIAR SESIÓN: Utilice la pantalla de Sign On en el Terminal 5250.");
+                setActiveTab(1);
+                return;
+              }
+              setActiveTab(4);
+            }}
             className={`px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${
               activeTab === 4 
                 ? "bg-[#1c1c1e] text-[#fbbf24] border-b-2 border-[#fbbf24]" 
@@ -978,7 +1292,14 @@ export default function App() {
 
           <button 
             id="btn-nav-bridge"
-            onClick={() => setActiveTab(5)}
+            onClick={() => {
+              if (!isLoggedOn) {
+                alert("DEBE INICIAR SESIÓN: Utilice la pantalla de Sign On en el Terminal 5250.");
+                setActiveTab(1);
+                return;
+              }
+              setActiveTab(5);
+            }}
             className={`px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${
               activeTab === 5 
                 ? "bg-[#1c1c1e] text-[#fbbf24] border-b-2 border-[#fbbf24]" 
@@ -1055,90 +1376,198 @@ export default function App() {
 
           {/* TAB 1: 5250 TERMINAL */}
           {activeTab === 1 && (
-            <div id="tab-terminal" className="flex-1 flex flex-col bg-[#050506] border border-[#2c2c2e] p-4 rounded-md font-mono relative overflow-hidden">
-              <div className="absolute top-4 right-4 text-[10px] text-[#ff453a] border border-[#ff453a]/50 bg-[#1c0808] px-2 py-1 font-bold animate-pulse uppercase rounded">
-                PANTALLA 5250 ACTIVA
-              </div>
-
-              {/* Title Header inside green terminal */}
-              <div className="text-white text-xs mb-4 border-b border-[#2c2c2e] pb-2 uppercase tracking-wide">
-                Simulación del Sistema Operativo OS/400 - Entrada Interactiva
-              </div>
-
-              {/* Terminal Logs container */}
-              <div className="flex-1 overflow-y-auto mb-4 space-y-1.5 pr-2 text-xs md:text-sm select-text">
-                {terminalLogs.map((log, index) => {
-                  if (log.startsWith("===>")) {
-                    return (
-                      <div key={index} className="flex items-center text-[#fbbf24] font-bold mt-2">
-                        <span className="text-white mr-2">{"===>"}</span>
-                        <span>{log.replace("===>", "").trim()}</span>
-                      </div>
-                    );
-                  }
-                  if (log.startsWith("S36 ===>")) {
-                    return (
-                      <div key={index} className="flex items-center text-[#34d399] font-bold mt-2">
-                        <span className="text-white mr-2">{"S36 ===>"}</span>
-                        <span>{log.replace("S36 ===>", "").trim()}</span>
-                      </div>
-                    );
-                  }
-                  if (log.startsWith("[SISTEMA]") || log.startsWith("[COMPILADOR]") || log.startsWith("[SESIÓN]") || log.startsWith("[S/36]")) {
-                    return <div key={index} className="text-[#60a5fa]">{log}</div>;
-                  }
-                  if (log.startsWith("[ERROR") || log.startsWith("[SQL ERROR]") || log.startsWith("[S/36 ERROR]")) {
-                    return <div key={index} className="text-[#ff453a] bg-[#1c0808] px-1 rounded inline-block">{log}</div>;
-                  }
-                  if (log.startsWith("[DATABASE]") || log.startsWith("[SQL SUCCESS]") || log.startsWith("[S/36 OUT]")) {
-                    return <div key={index} className="text-[#34d399]">{log}</div>;
-                  }
-                  if (log.startsWith(">")) {
-                    return <div key={index} className="text-white pl-4 border-l border-[#4ade80]/30">{log.substring(1)}</div>;
-                  }
-                  return <div key={index} className="opacity-95 leading-relaxed">{log}</div>;
-                })}
-                <div ref={terminalBottomRef} />
-              </div>
-
-              {/* CL Command prompt input */}
-              <div className="border-t border-[#2c2c2e] pt-4 mt-auto">
-                <div className="text-[#8e8e93] text-[10px] mb-2 uppercase tracking-wider">
-                  {s36Mode ? "System/36 Operator Control Language (OCL)" : "Mandatos Control Language (CL) / Consultas SQL"}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={s36Mode ? "text-[#34d399] font-bold text-sm shrink-0" : "text-white font-bold text-sm shrink-0"}>{s36Mode ? "S36 ===>" : "===>"}</span>
-                  <input
-                    id="terminal-input"
-                    ref={terminalInputRef}
-                    type="text"
-                    value={terminalInput}
-                    onChange={(e) => setTerminalInput(e.target.value)}
-                    onKeyDown={handleTerminalKeyDown}
-                    placeholder={s36Mode ? "Escriba un mandato S/36 (ej. HELP, STATUS, LISTLIBR, LOAD [pgm], RUN, ENDS36) y presione Enter..." : "Escriba un mandato (ej. HELP, WRKACTJOB, PDM, STRSQL, DSPPFM FILE(QUSERPF), STRS36) y presione Enter..."}
-                    className="flex-1 bg-[#111112] px-3 py-2 outline-none text-[#fbbf24] font-mono text-sm border-b-2 border-[#fbbf24] rounded-t focus:bg-[#1c1c1e] transition-colors"
-                    autoFocus
-                  />
-                </div>
-                <div className="flex justify-between items-center mt-3 text-[10px] text-[#8e8e93]">
-                  <div>(C) COPYRIGHT IBM CORP. 1980, 2026. LIBRERÍA GENERAL: <span className="text-white">QGPL</span></div>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => executeCLCommand("HELP")} 
-                      className="text-[#60a5fa] hover:underline"
-                    >
-                      [Ver Comandos CL]
-                    </button>
-                    <span>|</span>
-                    <button 
-                      onClick={() => executeCLCommand("CLEAR")} 
-                      className="text-[#ff453a] hover:underline"
-                    >
-                      [Limpiar]
-                    </button>
+            <div id="tab-terminal" className="flex-1 flex flex-col bg-[#050506] border border-[#2c2c2e] p-4 rounded-md font-mono relative overflow-hidden min-h-[480px]">
+              {!isLoggedOn ? (
+                <form onSubmit={handleSignOnSubmit} className="flex-1 flex flex-col justify-between text-[#34d399] p-2 md:p-6 select-text">
+                  <div className="text-right text-[11px] text-[#34d399] uppercase tracking-wider mb-2">
+                    Sistema . . . . . : <span className="text-white font-bold">{systemStatus.systemName}</span><br />
+                    Subsistema  . . . : <span className="text-white font-bold font-mono">QINTER</span><br />
+                    Dispositivo . . . : <span className="text-white font-bold font-mono">DSP01</span>
                   </div>
-                </div>
-              </div>
+
+                  <div className="text-center font-bold text-white text-base md:text-lg tracking-widest uppercase my-4 border-b border-[#2c2c2e] pb-2">
+                    Sign On (Inicio de Sesión)
+                  </div>
+
+                  {loginError && (
+                    <div className="bg-[#1c0808] border border-[#ff453a]/30 text-[#ff453a] px-3 py-1.5 rounded text-xs mb-4 text-center font-bold">
+                      [ERROR DE ACCESO]: {loginError}
+                    </div>
+                  )}
+
+                  <div className="space-y-4 max-w-lg mx-auto w-full text-xs md:text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="w-48 text-[#34d399] font-medium">Usuario . . . . . . . . . . . . . :</span>
+                      <input 
+                        type="text" 
+                        value={loginUser} 
+                        onChange={(e) => setLoginUser(e.target.value.toUpperCase())}
+                        placeholder="QSECOFR"
+                        className="bg-[#111112] border-b-2 border-[#34d399] px-2 py-1 outline-none text-[#fbbf24] w-48 font-bold text-center focus:bg-[#1c1c1e] transition-colors"
+                        autoFocus
+                        maxLength={10}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="w-48 text-[#34d399] font-medium">Contraseña  . . . . . . . . . . :</span>
+                      <input 
+                        type="password" 
+                        value={loginPassword} 
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="bg-[#111112] border-b-2 border-[#34d399] px-2 py-1 outline-none text-[#fbbf24] w-48 font-bold text-center focus:bg-[#1c1c1e] transition-colors"
+                        maxLength={10}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="w-48 text-[#34d399] font-medium">Programa/Procedimiento . . . . . :</span>
+                      <input 
+                        type="text" 
+                        value={loginProgram} 
+                        onChange={(e) => setLoginProgram(e.target.value.toUpperCase())}
+                        placeholder="*NONE"
+                        className="bg-[#111112] border-b-2 border-[#2c2c2e] px-2 py-1 outline-none text-[#8e8e93] w-48 text-center text-xs focus:bg-[#1c1c1e]"
+                        maxLength={10}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="w-48 text-[#34d399] font-medium">Menú Inicial . . . . . . . . . :</span>
+                      <input 
+                        type="text" 
+                        value={loginMenu} 
+                        onChange={(e) => setLoginMenu(e.target.value.toUpperCase())}
+                        placeholder="MAIN"
+                        className="bg-[#111112] border-b-2 border-[#34d399] px-2 py-1 outline-none text-[#fbbf24] w-48 font-bold text-center focus:bg-[#1c1c1e]"
+                        maxLength={10}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="w-48 text-[#34d399] font-medium">Biblioteca Corriente  . . . . . :</span>
+                      <input 
+                        type="text" 
+                        value={loginLibrary} 
+                        onChange={(e) => setLoginLibrary(e.target.value.toUpperCase())}
+                        placeholder="QGPL"
+                        className="bg-[#111112] border-b-2 border-[#34d399] px-2 py-1 outline-none text-[#fbbf24] w-48 font-bold text-center focus:bg-[#1c1c1e]"
+                        maxLength={10}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-8 pt-4 border-t border-[#2c2c2e] flex flex-col items-center gap-2 text-center text-[10px] text-[#8e8e93]">
+                    <div className="font-bold text-[#34d399] flex items-center gap-3">
+                      <button 
+                        type="submit" 
+                        className="bg-[#132c1c] border border-[#34d399]/40 hover:bg-[#1c452b] text-[#34d399] font-bold px-6 py-2 rounded transition-all text-xs cursor-pointer"
+                      >
+                        [ Presione ENTER para Iniciar Sesión ]
+                      </button>
+                    </div>
+                    <div className="mt-2 font-sans text-[11px] leading-relaxed">
+                      Sugerencia: Inicie sesión con <span className="text-white font-bold">QSECOFR</span> o cualquier perfil personalizado.<br />
+                      (C) COPYRIGHT IBM CORP. 1980, 2026.
+                    </div>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <div className="absolute top-4 right-4 text-[10px] text-[#ff453a] border border-[#ff453a]/50 bg-[#1c0808] px-2 py-1 font-bold animate-pulse uppercase rounded">
+                    PANTALLA 5250 ACTIVA
+                  </div>
+
+                  {/* Title Header inside green terminal */}
+                  <div className="text-white text-xs mb-4 border-b border-[#2c2c2e] pb-2 uppercase tracking-wide flex justify-between items-center">
+                    <span>Simulación del Sistema Operativo OS/400 - Entrada Interactiva</span>
+                    <span className="text-[#fbbf24] font-bold">[USR: {currentUser}]</span>
+                  </div>
+
+                  {/* Terminal Logs container */}
+                  <div className="flex-1 overflow-y-auto mb-4 space-y-1.5 pr-2 text-xs md:text-sm select-text">
+                    {terminalLogs.map((log, index) => {
+                      if (log.startsWith("===>")) {
+                        return (
+                          <div key={index} className="flex items-center text-[#fbbf24] font-bold mt-2">
+                            <span className="text-white mr-2">{"===>"}</span>
+                            <span>{log.replace("===>", "").trim()}</span>
+                          </div>
+                        );
+                      }
+                      if (log.startsWith("S36 ===>")) {
+                        return (
+                          <div key={index} className="flex items-center text-[#34d399] font-bold mt-2">
+                            <span className="text-white mr-2">{"S36 ===>"}</span>
+                            <span>{log.replace("S36 ===>", "").trim()}</span>
+                          </div>
+                        );
+                      }
+                      if (log.startsWith("[SISTEMA]") || log.startsWith("[COMPILADOR]") || log.startsWith("[SESIÓN]") || log.startsWith("[S/36]")) {
+                        return <div key={index} className="text-[#60a5fa]">{log}</div>;
+                      }
+                      if (log.startsWith("[ERROR") || log.startsWith("[SQL ERROR]") || log.startsWith("[S/36 ERROR]")) {
+                        return <div key={index} className="text-[#ff453a] bg-[#1c0808] px-1 rounded inline-block">{log}</div>;
+                      }
+                      if (log.startsWith("[DATABASE]") || log.startsWith("[SQL SUCCESS]") || log.startsWith("[S/36 OUT]")) {
+                        return <div key={index} className="text-[#34d399]">{log}</div>;
+                      }
+                      if (log.startsWith(">")) {
+                        return <div key={index} className="text-white pl-4 border-l border-[#4ade80]/30">{log.substring(1)}</div>;
+                      }
+                      return <div key={index} className="opacity-95 leading-relaxed">{log}</div>;
+                    })}
+                    <div ref={terminalBottomRef} />
+                  </div>
+
+                  {/* CL Command prompt input */}
+                  <div className="border-t border-[#2c2c2e] pt-4 mt-auto">
+                    <div className="text-[#8e8e93] text-[10px] mb-2 uppercase tracking-wider">
+                      {s36Mode ? "System/36 Operator Control Language (OCL)" : "Mandatos Control Language (CL) / Consultas SQL"}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={s36Mode ? "text-[#34d399] font-bold text-sm shrink-0" : "text-white font-bold text-sm shrink-0"}>{s36Mode ? "S36 ===>" : "===>"}</span>
+                      <input
+                        id="terminal-input"
+                        ref={terminalInputRef}
+                        type="text"
+                        value={terminalInput}
+                        onChange={(e) => setTerminalInput(e.target.value)}
+                        onKeyDown={handleTerminalKeyDown}
+                        placeholder={s36Mode ? "Escriba un mandato S/36 (ej. HELP, STATUS, LISTLIBR, LOAD [pgm], RUN, ENDS36) y presione Enter..." : "Escriba un mandato (ej. HELP, WRKACTJOB, PDM, STRSQL, DSPPFM FILE(QUSERPF), STRS36) y presione Enter..."}
+                        className="flex-1 bg-[#111112] px-3 py-2 outline-none text-[#fbbf24] font-mono text-sm border-b-2 border-[#fbbf24] rounded-t focus:bg-[#1c1c1e] transition-colors"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="flex justify-between items-center mt-3 text-[10px] text-[#8e8e93]">
+                      <div>(C) COPYRIGHT IBM CORP. 1980, 2026. LIBRERÍA GENERAL: <span className="text-white">{loginLibrary.toUpperCase() || "QGPL"}</span></div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => executeCLCommand("HELP")} 
+                          className="text-[#60a5fa] hover:underline"
+                        >
+                          [Ver Comandos CL]
+                        </button>
+                        <span>|</span>
+                        <button 
+                          onClick={() => executeCLCommand("CLEAR")} 
+                          className="text-[#ff453a] hover:underline"
+                        >
+                          [Limpiar]
+                        </button>
+                        <span>|</span>
+                        <button 
+                          onClick={() => executeCLCommand("SIGNOFF")} 
+                          className="text-[#fbbf24] hover:underline font-bold"
+                        >
+                          [Cerrar Sesión (SIGNOFF)]
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

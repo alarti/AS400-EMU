@@ -30,7 +30,7 @@ export interface ActiveJob {
 export interface SystemMessage {
   id: string;
   timestamp: string;
-  type: "INFO" | "WARNING" | "ERROR";
+  type: "INFO" | "WARNING" | "ERROR" | "BREAK";
   sender: string;
   text: string;
 }
