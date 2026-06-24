@@ -1,0 +1,6 @@
+{
+  "name": "AS/400 iSeries Emulator & Trainer",
+  "description": "An immersive retro IBM iSeries AS/400 emulator and training system. Emulates the classic 5250 green-screen terminal, commands (CL), Source Entry Utility (SEU), and DB2 database, with a Gemini-powered compiler/runtime for COBOL and RPG testing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
